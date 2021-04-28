@@ -11,8 +11,7 @@ URLs: https://api.yelp.com/v3/businesses/search
 This project uses Yelp Fusion API to get all the restaurant data. Yelp Fusion API uses private API Keys to authenticate requests, so you need to apply an API Key to access it. 
 Visit https://www.yelp.com/fusion to get your own API Key. 
 Name it API_KEY to run this project.
-
-* 2. Mapbox
+* 2.Mapbox
 This project uses Mapbox to precise location data and create restaurant maps. You need to apply an mapbox token to use this toolbox.
 Visit https://www.mapbox.com/ to get your own secret key. 
 Name it MAPBOX_TOKEN to run this project.
