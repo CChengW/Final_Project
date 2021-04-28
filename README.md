@@ -18,3 +18,23 @@ Name it MAPBOX_TOKEN to run this project.
 
 * Required Python packages:
 requests, beautifulsoup4, bs4, sqlite3, time, plotly
+
+User guide:
+-----------
+Install the required python packages, then run the final_project.py file.  
+First, the program provides a list of 100 cities you can choose from.     
+Users can choose to see the fitting curve of rating distribution or get the list of all restaurants in the city.
+
+    1.Choose a city to see the rating distribution.
+    2.Choose a city to see all the restaurants here.
+If choose 1, users can input a city to see the fitting curve of rating distribution (Using Kernel Density Estimation).   
+If choose 2, users can input a city to see the list of all restaurants in this city sorted by rating.
+
+Users will then have four options:
+
+    1. View the review count distribution.
+    2. View the average rating.
+    3. View the restaurant distribution map.
+    4. Enter a restaurant you like to see the details.
+For 1, 2 & 3, users will see the corresponding charts and maps, for 4 they can input any restaurants in the list to see the detailed information.  
+Note that users can choose to back to superior menu or exit at any time.
