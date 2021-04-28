@@ -24,7 +24,6 @@ MAPBOX_TOKEN=secrets.MAPBOX_TOKEN
 headers = {"Authorization": "Bearer " + API_KEY}
 DBNAME = 'final.db'
 
-
 def open_cache():
     ''' Opens the cache file if it exists and loads the JSON into
     the CACHE_DICT dictionary.
@@ -119,6 +118,8 @@ def make_request_with_cache(baseurl, params):
     ----------
     baseurl: string
         The URL for the API endpoint
+    params: dictionary
+        A dictionary of param:value pairs
     
     Returns
     -------
@@ -137,6 +138,21 @@ def make_request_with_cache(baseurl, params):
         return CACHE_DICT[request_url]
 
 def make_request_with_cache_url(request_url):
+    '''Check the cache for a saved result for this request_url:values
+    combo. If the result is found, return it. Otherwise send a new 
+    request, save it, then return it.
+
+    Parameters
+    ----------
+    request_url: string
+        The URL for the API endpoint
+    
+    Returns
+    -------
+    dict
+        the results of the query as a dictionary loaded from cache
+        JSON
+    '''
     if request_url in CACHE_DICT.keys():
         print("Using CACHE")
         return CACHE_URL[request_url]
@@ -145,18 +161,12 @@ def make_request_with_cache_url(request_url):
         CACHE_URL[request_url]=response.text
         save_cache(CACHE_URL)
         return CACHE_URL[request_url]
-class City:
 
-    def __init__(self, name, rank, state, location):
-        self.name=name
-        self.rank=int(rank)
-        self.state=state
-        self.location=location
-    def info(self):
-        return self.rank + self.name+ self.state + self.location
+
 
 conn = sqlite3.connect(DBNAME)
 cur = conn.cursor()
+
 ##scrape the wikipedia page
 def build_city_information_list():
     ''' Make a list of city information from "https://en.wikipedia.org/wiki/List_of_United_States_cities_by_population"
@@ -190,20 +200,16 @@ def build_city_information_list():
             state_list.append(city_listing[2].text[1:-1])
         latitude_list.append((city_listing[-1].find("span",class_="geo-dec").text.split()[0][:2]))    
         longitude_list.append((city_listing[-1].find("span",class_="geo-dec").text.split()[0][:2])) 
-        time.sleep(0.5)
+        time.sleep(0.1)
     city_list=[]  
     for i in range(len(city_name_list)):
         city_list.append((int(i+1),city_name_list[i],state_list[i],latitude_list[i],longitude_list[i]))
-    for i in city_list:
-        print (i)
+    # for i in city_list:
+    #     print (i)
 
     
     return city_list
-#build_city_information_list()
-City_list=[]
-for city in build_city_information_list():
-    City_list.append(city[1])
-#print(City_list)
+
 
 #Create city database
 drop_cities = '''
@@ -231,28 +237,74 @@ conn.commit()
 
 ###Get restaurants information from YELP FUSION API###
 class restaurant:
-    def __init__(self,name,categories,rating,latitude,longitude,state,city,zipcode):
+    '''a restaurant
+
+    Instance Attributes
+    -------------------
+    name: string
+        the name of a restaurant (e.g. 'Molinari Delicatessen')
+
+    rating: float
+        the rating of a restaurant (e.g. '4.5')
+
+    phone: string
+        the phone of a restaurant (e.g. '+14154212337')
+
+    latitude: float
+        the latitude of a restaurant (e.g. '37.7983818054199')
+
+    longitude: float
+        the longitude of a restaurant (e.g. '-122.407821655273')
+
+    categories: string
+        the categories of a restaurant (e.g. 'delis')
+
+    review_count: int
+        the review_count of a restaurant (e.g. '910')
+
+    city: string
+        the city of a restaurant (e.g. 'US')
+
+    state: string
+        the state of a restaurant (e.g. 'CA')
+
+    address1: string
+        the address1 of a restaurant (e.g. '373 Columbus Ave')
+
+    zip_code: int
+        the zip_code of a restaurant (e.g. '94133')
+    '''
+    def __init__(self,name,categories,rating,latitude,longitude,state,city,address1,zipcode,phone,review_count):
         self.name=name
         self.categories=categories
         self.rating=int(rating)
-        self.coordinates=coordinates
+        self.latitude=latitude
+        self.longitude=longitude
         self.state=state
         self.city=city
+        self.address1=address1
         self.zipcode=zipcode
+        self.phone=phone
+        self.review_count=review_count
     def info(self):
-        return self.name + self.categories+ self.rating + self.state + self.city
+        return self.name + self.categories+ self.rating + self.latitude+  self.longitude + self.state + self.city
 
 def get_restaurants(city_name, term='food'):
-    """Generates a resturant dict from Yelp Fusion api for a specific city with cache checking
+    '''make a request to the Yelp Fusion API 
+       and generates a restaurant dict with cache
+
     Parameters
     ----------
-    city_name
-    term
+    city_name: str
+        name of a city
+    term: str
+        term='food'
+
     Returns
     -------
     dict:
-        API raw dict
-    """
+        the API dict
+    '''
     yelp_url = 'https://api.yelp.com/v3/businesses/search'
     yelp_dict = make_request_with_cache(yelp_url, {
         'location': city_name,
@@ -260,8 +312,22 @@ def get_restaurants(city_name, term='food'):
         'limit': 50
     })
     return yelp_dict
-#get_restaurants('Hoboken city', term='food')
+
 def get_restaurant_list(city_name):
+    ''' get a list of all restaurants of a city, 
+        including the information of  name, categories and rating,
+        restaurants are sorted by rating 
+
+    Parameters
+    ----------
+    city_name2: str
+        name of a city
+
+    Returns
+    -------
+    list
+        A list of all the restaurant information
+    '''
     restaurant_dict=get_restaurants(city_name, term='food')
     restaurant_list=[]
     id_list=[]
@@ -283,24 +349,37 @@ def get_restaurant_list(city_name):
         restaurant_list.append(tuple(businesses_list))
     restaurant_list=sorted(restaurant_list,key=lambda bu:bu[2],reverse=True) 
     k=0
-    for i in restaurant_list:
-        k+=1
-        print(k,i)
+    # for i in restaurant_list:
+    #     k+=1
+    #     print(k,i)
     return restaurant_list
-#get_restaurant_list('Hoboken city')
+
 def get_restaurant_detail(res_name,city_name1):
+    ''' get the detailed information of a restaurant
+
+    Parameters
+    ----------
+    res_name: str
+        name of a restaurant
+    city_name1: str
+        name of a city
+
+    Returns
+    -------
+    str
+        Detailed information of a restaurant
+    '''
     restaurant_dict=get_restaurants(city_name1, term='food')
     name_list=[]
     for i in restaurant_dict["businesses"]:
         name_list.append(i['name'])
     detail_list=[]
-    #print(restaurant_dict["businesses"][1]['name'])
+   
     if res_name in name_list:
         for i in range(len(name_list)):
             if restaurant_dict["businesses"][i]['name']==res_name:
                 name=restaurant_dict["businesses"][i]['name']
                 rating=restaurant_dict["businesses"][i]['rating']
-                price=restaurant_dict["businesses"][i]['price']
                 phone=restaurant_dict["businesses"][i]['phone']
                 latitude=restaurant_dict["businesses"][i]['coordinates']['latitude']
                 longitude=restaurant_dict["businesses"][i]['coordinates']['longitude']
@@ -310,10 +389,10 @@ def get_restaurant_detail(res_name,city_name1):
                 state=restaurant_dict["businesses"][i]['location']['state']
                 address=restaurant_dict["businesses"][i]['location']['address1']
                 zipcode=restaurant_dict["businesses"][i]['location']['zip_code']
+                print(" ")
                 print('name:',name)
                 print('categories:',categories)
                 print('rating:',rating)
-                print('price:',price)
                 print('phone:',phone)
                 print('review_count:',review_count)
                 print('coordinates:','[',latitude,longitude,']')
@@ -325,10 +404,21 @@ def get_restaurant_detail(res_name,city_name1):
                 continue
     else:
         print('Sorry,no such restaurant in this city. Please choose another restaurant.')
-#get_restaurant_detail('Loquito','Hoboken city')
 
-#Create restaurant database
+
 def get_all_restaurant(city_name2):
+    ''' get all restaurant information of a city
+
+    Parameters
+    ----------
+    city_name2: str
+        name of a city
+
+    Returns
+    -------
+    list
+        A list of all the restaurant information
+    '''
     restaurant_dict=get_restaurants(city_name2, term='food')
     restaurant_list=[]
     id_list=[]
@@ -393,15 +483,29 @@ for i in City_list:
         cur.execute(insert_restaurants,c)
 conn.commit()
 
-def get_info_form_database(props, params=None):
+def get_info_form_database(info, params=None):
+    ''' get all restaurant information from the database
+
+    Parameters
+    ----------
+    info: list
+        a list of strings want to query
+    params: dict
+        A dictionary of param:value pairs
+
+    Returns
+    -------
+    list
+        A list of all the restaurant information queried
+    '''
     conn = sqlite3.connect(DBNAME)
     cur = conn.cursor()
-    #print(len(props))
-    real_props = ""
-    for i in range(len(props)):
-        real_props += "b.{}".format(props[i]) + ", "
-    real_props = real_props[:-2]
-    command = f'SELECT {real_props} FROM restaurants as b'
+
+    real_info = ""
+    for i in range(len(info)):
+        real_info += "b.{}".format(info[i]) + ", "
+    real_info = real_info[:-2]
+    command = f'SELECT {real_info} FROM restaurants as b'
     if params is not None:
         keys = list(params.keys())
         for key in keys:
@@ -412,5 +516,301 @@ def get_info_form_database(props, params=None):
     command += ";"
     result = cur.execute(command).fetchall()
     conn.close()
-    print(result)
+
     return result
+
+def kde_rating(user_city):
+    ''' show kernel rating distribution of all restaurants in a city 
+
+    Parameters
+    ----------
+    user_city: str
+        name of a city
+
+    Return
+    ----------
+    The kernel rating distribution of all restaurants in a city : fig
+    '''
+    text_list = []
+    ra_list = []
+    for bu in get_info_form_database(["name","CityName", "categories","rating"], {"CityName": user_city}):
+        text_list.append("{} ({}): {}, rating: {}".format(bu[0], bu[1], bu[2], bu[3]))
+        ra_list.append(bu[3])
+    fig = ff.create_distplot([ra_list], ['rating'], bin_size=.2, 
+                             show_hist=False, show_rug=False)
+    fig.update_xaxes(title_text="rating", ticks="inside")
+    fig.update_yaxes(title_text="Kernel Density", ticks="inside")
+    fig.update_layout(font=dict(size=20, family='Calibri', color='black'),
+                      template="ggplot2",
+                      title={'text': "Kernel Rating Distribution"})
+    print("Plotting")
+    print('-' * 47)
+    fig.write_html("rating_distribution.html", auto_open=True)
+    return fig
+
+def print_average_rating(params):
+    ''' Caculate the average rating of all restaurants in a city 
+
+    Parameters
+    ----------
+    params: dict
+        A dictionary of param:value pairs
+
+    Return
+    ----------
+    The average rating of all restaurants in a city: str
+    '''
+    info_list = get_info_form_database(['rating'], params)
+    average = sum(float(rating[0]) for rating in info_list) / len(info_list)
+    print(f'The average rating is {average}')
+    print('-' * 47)
+
+def plot_rating_distribution(params):
+    ''' show the rating distribution of all restaurants in a city 
+
+    Parameters
+    ----------
+    params: dict
+        A dictionary of param:value pairs
+
+    Return
+    ----------
+    The rating distribution of all restaurants in a city : fig
+    '''
+    info_list = get_info_form_database(['rating'], params)
+    rating_list = [float(rating[0]) for rating in info_list]
+    fig = ff.create_distplot([rating_list], ['Rating'], bin_size=0.5)
+    fig.update_layout(font=dict(size=20, family='Calibri', color='black'),
+                      template="ggplot2",
+                      title={'text': "Rating Distribution"})
+    print("Plotting")
+    print('-' * 47)
+    fig.write_html("rating.html", auto_open=True)
+
+def plot_review_count_distribution(params):
+    ''' show the review count distribution of all restaurants in a city 
+
+    Parameters
+    ----------
+    params: dict
+        A dictionary of param:value pairs
+
+    Return
+    ----------
+    The review count distribution of all restaurants in a city : fig
+    '''
+    info_list = get_info_form_database(['review_count','name'], params)
+    review_count_list = [float(review_count[0]) for review_count in info_list]
+    name_list=[name[1] for name in info_list]
+
+    bar_data = go.Bar(x=name_list, y=review_count_list)
+    basic_layout = go.Layout(title="Review count Distribution")
+    fig = go.Figure(data=bar_data, layout=basic_layout)
+    fig.update_layout(font=dict(family='Calibri', color='black'),
+                      template="ggplot2",
+                      title={'text': "Review count Distribution"})
+    print("Plotting")
+    print('-' * 47)
+    fig.write_html("scatter.html", auto_open=True)
+
+
+def map_cities(user_city):
+    ''' show the restaurant map in a city
+
+    Parameters
+    ----------
+    user_city: str
+        name of a city
+
+    Return
+    ----------
+    The restaurant map: fig
+    '''
+    text_list = []
+    lat_list = []
+    lon_list = []
+    rating_list = []
+    for bu in get_info_form_database(["name", "CityName", "review_count", "Latitude", "Longitude", "rating"], {"CityName": user_city}):
+        text_list.append("{} ({}): {}, rating: {}".format(bu[0], bu[1], bu[2], bu[5]))
+        lat_list.append(bu[3])
+        lon_list.append(bu[4])
+        rating_list.append(bu[5])
+    ave_lat = sum(lat_list) / len(lat_list)
+    ave_lon = sum(lon_list) / len(lon_list)
+    fig = go.Figure(
+        go.Scattermapbox(
+            lat=lat_list,
+            lon=lon_list,
+            mode='markers',
+            marker=go.scattermapbox.Marker(size=15, color=rating_list,
+                                           opacity=0.5,
+                                           #symbol='star'
+                                           colorbar=dict(title="ratings"),
+                                           colorscale="sunset"),
+            text=text_list,
+        ))
+
+    layout = dict(
+        autosize=True,
+        hovermode='closest',
+        mapbox=go.layout.Mapbox(
+            accesstoken=MAPBOX_TOKEN,
+            bearing=0,
+            center=go.layout.mapbox.Center(lat=ave_lat,
+                                           lon=ave_lon),
+            pitch=0,
+            zoom=10),
+        plot_bgcolor="slategrey",
+        paper_bgcolor="lightyellow",
+        width=1200,
+        height=700
+    )
+
+    fig.update_layout(layout)
+    print("----------------- Generating map -----------------")
+    print(" ")
+    fig.write_html("map.html", auto_open=True)
+
+    return fig
+
+
+
+if __name__ == "__main__":
+    City_list=[]
+    for city in build_city_information_list():
+        City_list.append(city[1])
+    print(" ")
+    print("Welcome! This program provides you all the restaurant informations you want in the 100 most populous cities!")
+    print("Let's start now!")
+    print(" ")
+    print("Here is the 100 largest cities in United States:")
+    count=0
+    for i in City_list:
+        count+=1
+        print(count,i)
+    while True:
+        print('-'*47)
+        print("1.Choose a city to see the rating distribution.")
+        print("2.Choose a city to see all the restaurants here.")
+        print('-'*47)
+        user_choice=input("Enter a number to get information or 'exit':")
+        if user_choice.lower()=='exit':
+            exit()
+        elif user_choice.isnumeric():
+            if int(user_choice) == 1:
+                print(" ")
+                city_input=input("Please enter a city you want to see the Kernel density distribution of rating:")
+                if city_input in City_list:
+                    print(" ")
+                    kde_rating(city_input)
+                else:
+                    print('[Error] Please enter a proper city from above!')
+            elif int(user_choice) == 2:
+                while True:
+                    flag = True
+                    print(" ")
+                    city_input1=input("Please input a city you want to see the restaurant information or back or exit:")
+                    if city_input1 in City_list:
+                        print(" ")
+                        print("Here is all the restaurants in the city (sorted by ratings)!")
+                        print(" ")
+                        k=0
+                        for i in get_restaurant_list(city_input1):
+                            k+=1
+                            print(k,i)
+                        while True:
+                            print('-'*47)
+                            print("Now you have four choices:")
+                            print("1. View the review count distribution.")
+                            print("2. View the average rating.")
+                            print("3. View the restaurant distribution map.")
+                            print("4. Enter a restaurant you like to see the details.")
+                            print('-'*47)
+                            print(" ")
+                            user_input=input("Please enter a number to get the corresponding information or back or exit:")
+                            if user_input.isnumeric():
+                                if int(user_input) == 1:
+                                    print(" ")
+                                    plot_review_count_distribution({"CityName": city_input1})
+                                    print(" ")
+                                    user_input1=input("Please enter any key to return or 'exit':")
+                                    print(" ")
+                                    if user_input1 == 'exit':
+                                        exit()
+                                    else:
+                                        continue
+                                elif int(user_input) == 2:
+                                    print(" ")
+                                    print("After caculation:")
+                                    print_average_rating({"CityName": city_input1})
+                                    print(" ")
+                                    plot_rating_distribution({"CityName": city_input1})
+                                    print(" ")
+                                    user_input2=input("Please enter any key to return or 'exit':")
+                                    print(" ")
+                                    if user_input2 == 'exit':
+                                        exit()
+                                    else :
+                                        continue
+                                elif int(user_input) == 3:
+                                    print(" ")
+                                    map_cities(city_input1)
+                                    print(" ")
+                                    user_input3=input("Please enter any key to return or 'exit':")
+                                    print(" ")
+                                    if user_input3 == 'exit':
+                                        exit()
+                                    else:
+                                        continue
+                                elif int(user_input) == 4:
+                                    print(" ")
+                                    restaurant_input=input("Please enter a restaurant to see the details:")
+                                    restaurant_list=[]
+                                    for i in get_restaurant_list(city_input1):
+                                        restaurant_list.append(i[0])
+                                    if restaurant_input in restaurant_list:
+                                        get_restaurant_detail(restaurant_input,city_input1)
+                                        user_input4=input("Please enter any key to return or 'exit':")
+                                        print(" ")
+                                        if user_input4 == 'exit':
+                                            exit()
+                                        else:
+                                            continue
+                                    else:
+                                        print(" ")
+                                        print('[Error] Please enter a proper restaurant name!')
+                                        print(" ")
+                                else:
+                                    print(" ")
+                                    print('[Error] Please enter a proper number(1 or 2 or 3 or 4) or exit!')
+                                    print('-'*47)
+                                    print(" ")
+                                    continue
+                            elif user_input == 'exit':
+                                exit()
+                            elif user_input == 'back':
+                                break
+                            else:
+                                print(" ")
+                                print('[Error] Please enter a proper number (1 or 2 or 3 or 4) or enter "back" to choose another city or exit!')
+                                print('-'*47)
+                                print(" ")
+                                continue
+                    elif city_input1 == 'exit':
+                        exit()
+                    elif city_input1 == 'back':
+                        break
+                    else:
+                        print(" ")
+                        print('[Error] Please enter a proper city from above!')
+                        print(" ")
+                        continue
+            else:
+                print(" ")
+                print('[Error] Please enter a proper number (1 or 2)!')
+                print(" ")
+                continue
+        else:
+            print(" ")
+            print('[Error] Invalid input! Please enter a proper number (1 or 2) or exit!')
+            print(" ")
